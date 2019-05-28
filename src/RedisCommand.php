@@ -62,24 +62,36 @@ class RedisCommand extends SymfonyCommand
                     $io->listing([
                             'help : 显示可用命令',
                             'ls : 列出所有keys',
-                            'ls h?llo: 列出匹配keys,?通配1个字符,*通配任意长度字符,[aei]通配选线,特殊符号用\隔开',
+                            'ls h?llo : 列出匹配keys,?通配1个字符,*通配任意长度字符,[aei]通配选线,特殊符号用\隔开',
                             'ttl key [ttl second] : 获取/设定生存时间,传第二个参数会设置生存时间',
+                            'mv key new_key : key改名,如果新名字存在则会报错',
+                            'rm key : 刪除key,暂时不支持通配符匹配(太危险,没想好是否要支持)',
                         ]
                     );
                     break;
                 case stripos($command, 'ls') === 0 :
-                    $parameter = trim(str_replace('ls', '', $command));
+                    $parameter = trim(substr($command, 2));
                     // 先写这里,回头再抽象
                     $this->listTable($parameter);
                     break;
                 case stripos($command, 'ttl') === 0 :
-                    $parameter = trim(str_replace('ttl', '', $command));
+                    $parameter = trim(substr($command, 3));
                     $parameter = explode(' ', $parameter, 2);
                     if (count($parameter) == 1) {
                         $this->getTtl($parameter);
                     } else {
                         $this->setTtl($parameter);
                     }
+                    break;
+                case stripos($command, 'mv') === 0 :
+                    $parameter = trim(substr($command, 2));
+                    $parameter = explode(' ', $parameter, 2);
+                    $this->rename($parameter);
+                    break;
+                case stripos($command, 'rm') === 0 :
+                    $parameter = trim(substr($command, 2));
+                    $parameter = explode(' ', $parameter, 2);
+                    $this->rm($parameter);
                     break;
                 default:
             }
@@ -169,8 +181,8 @@ class RedisCommand extends SymfonyCommand
         if (empty($search)) {
             $search = '*';
         }
-
         $keys = $this->redis->keys($search);
+        sort($keys);
         $data = [];
         foreach ($keys as $key) {
             $type = $this->redis->type($key);
@@ -252,6 +264,45 @@ class RedisCommand extends SymfonyCommand
             $this->io->error($e->getMessage());
         }
 
+    }
+
+    // 重命名key
+    protected function rename($parameters)
+    {
+        try {
+            if (!key_exists('1', $parameters)) {
+                throw new \Exception("缺少第2个参数");
+            }
+            $result = $this->redis->renameNx($parameters[0], $parameters[1]);
+            // 格式化显示
+            if ($result == 1) {
+                // 成功
+                $this->io->success("修改成功");
+            } else {
+                // 失败
+                $this->io->error("修改失败");
+            }
+        } catch (\Exception $e) {
+            $this->io->error($e->getMessage());
+        }
+    }
+
+    // 删除key
+    protected function rm($parameters)
+    {
+        try {
+            if (!$this->redis->exists($parameters[0])) {
+                throw new \Exception("KEY: {$parameters[0]} 不存在");
+            }
+            $confirm = $this->io->confirm("确定要删除 {$parameters[0]} ?", false);
+            if ($confirm) {
+                $this->redis->del($parameters[0]);
+                $this->io->success("删除成功");
+            }
+
+        } catch (\Exception $e) {
+            $this->io->error($e->getMessage());
+        }
     }
 
 }
