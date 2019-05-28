@@ -1,0 +1,13 @@
+#!/usr/bin/env php
+<?php
+// redis 客户端的php版本,方便使用的
+require_once __DIR__ . '/vendor/autoload.php';
+
+use Symfony\Component\Console\Application;
+
+$command = new \Console\RedisCommand();
+
+$app = new Application('Console Redis Cli (Redis客户端)', 'v1.0.0');
+$app->add($command);
+$app->setDefaultCommand($command->getName());
+$app->run();
