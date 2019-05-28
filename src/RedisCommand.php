@@ -218,7 +218,7 @@ class RedisCommand extends SymfonyCommand
         try {
             $ttl = $this->redis->ttl($parameters[0]);
             // 格式化显示
-            switch ($ttl){
+            switch ($ttl) {
                 case -2:
                     $ttl = '<fg=black;bg=magenta>KEY不存在</>';
                     break;
@@ -229,6 +229,23 @@ class RedisCommand extends SymfonyCommand
             }
             $this->io->table(['KEY', 'TTL (秒s)'], [
                     [$parameters[0], $ttl],
+                ]
+            );
+        } catch (\Exception $e) {
+            $this->io->error($e->getMessage());
+        }
+
+    }
+
+    // 设置过期时间
+    protected function setTtl($parameters)
+    {
+        try {
+            $result = $this->redis->EXPIRE($parameters[0], (integer)$parameters[1]);
+            // 格式化显示
+            $result = $result == 1 ? ('<info>生存时间设置为: ' . (integer)$parameters[1] . ' (秒)</info>') : '<error>失败</error>';
+            $this->io->table(['KEY', 'TTL (秒s)'], [
+                    [$parameters[0], $result],
                 ]
             );
         } catch (\Exception $e) {
