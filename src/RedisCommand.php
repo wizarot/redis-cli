@@ -44,8 +44,6 @@ class RedisCommand extends SymfonyCommand
             die;
         }
 
-        //        $io->progressStart();
-
         do {
             $command = trim($io->ask("{$host}:{$port}", '-'));
             // 每次执行前,查看重连数据库
@@ -59,21 +57,6 @@ class RedisCommand extends SymfonyCommand
 
             // 处理命令行逻辑
             switch (true) {
-                case stripos($command, 'help') === 0 :
-                    // 帮助列表
-                    $io->title('Help List 命令列表');
-                    $io->listing([
-                            'help : 显示可用命令',
-                            'ls : 列出所有keys',
-                            'ls h?llo : 列出匹配keys,?通配1个字符,*通配任意长度字符,[aei]通配选线,特殊符号用\隔开',
-                            'ttl key [ttl second] : 获取/设定生存时间,传第二个参数会设置生存时间',
-                            'mv key new_key : key改名,如果新名字存在则会报错',
-                            'rm key : 刪除key,暂时不支持通配符匹配(太危险,没想好是否要支持)',
-                            'set key : 设置值',
-                        ]
-                    );
-
-                    break;
                 case stripos($command, 'ls') === 0 :
                     $parameter = trim(substr($command, 2));
                     // 先写这里,回头再抽象
@@ -108,13 +91,34 @@ class RedisCommand extends SymfonyCommand
                     $parameter = explode(' ', $parameter, 2);
                     $this->get($parameter);
                     break;
+                case stripos($command, 'exit') === 0 :
+                    // 退出
+                    $io->success('Bye!');
 
+                    return true;
+                    break;
+                case stripos($command, 'help') === 0 :
                 default:
+                    // 帮助列表
+                    $io->title('Help List 命令列表');
+                    $io->listing([
+                            'help : 显示可用命令',
+                            'ls : 列出所有keys',
+                            'ls h?llo : 列出匹配keys,?通配1个字符,*通配任意长度字符,[aei]通配选线,特殊符号用\隔开',
+                            'ttl key [ttl second] : 获取/设定生存时间,传第二个参数会设置生存时间',
+                            'mv key new_key : key改名,如果新名字存在则会报错',
+                            'rm key : 刪除key,暂时不支持通配符匹配(太危险,没想好是否要支持)',
+                            'get key : 获取值',
+                            'set key : 设置值',
+                        ]
+                    );
+
+                    break;
+
             }
 
         } while (strtolower($command) != 'exit');
 
-        //        $io->progressFinish();
         $io->success('Bye!');
         die;
 
@@ -410,13 +414,13 @@ class RedisCommand extends SymfonyCommand
                 ]
             );
 
-            // TODO: 根据类型显示值
-            //        none(key不存在) int(0)
-            //        string(字符串) int(1)
-            //        list(列表) int(3)
-            //        set(集合) int(2)
-            //        zset(有序集) int(4)
-            //        hash(哈希表) int(5)
+            // 根据类型显示值
+            // none(key不存在) int(0)
+            // string(字符串) int(1)
+            // list(列表) int(3)
+            // set(集合) int(2)
+            // zset(有序集) int(4)
+            // hash(哈希表) int(5)
             switch ($type) {
                 case 0:
                     throw new \Exception("KEY: {$key} 不存在");
@@ -460,10 +464,11 @@ class RedisCommand extends SymfonyCommand
                         ['ID', 'SCORE', 'MEMBER'],
                         $data
                     );
+                    break;
                 case 5:
                     // 哈希表
                     $this->io->section('VALUE:');
-                    $value = $this->redis->hGetAll($key);
+                    $value = (array)$this->redis->hGetAll($key);
                     $data = [];
                     foreach ($value as $key => $item) {
                         $data[] = [
