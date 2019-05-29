@@ -432,6 +432,50 @@ class RedisCommand extends SymfonyCommand
                         print_r($data);
                     }
                     break;
+                case 2:
+                    // 集合set
+                    $this->io->section('VALUE:');
+                    $value = $this->redis->sMembers($key);
+                    print_r($value);
+                    break;
+                case 3:
+                    // 列表List
+                    $this->io->section('VALUE:');
+                    $value = $this->redis->lRange($key, 0, -1);
+                    print_r($value);
+                    break;
+                case 4:
+                    // 有续集Zset
+                    $this->io->section('VALUE:');
+                    $value = $this->redis->zRange($key, 0, -1);
+                    $data = [];
+                    foreach ($value as $id => $item) {
+                        $data[] = [
+                            $id,
+                            $this->redis->zScore($key, $item),
+                            $item,
+                        ];
+                    }
+                    $this->io->table(
+                        ['ID', 'SCORE', 'MEMBER'],
+                        $data
+                    );
+                case 5:
+                    // 哈希表
+                    $this->io->section('VALUE:');
+                    $value = $this->redis->hGetAll($key);
+                    $data = [];
+                    foreach ($value as $key => $item) {
+                        $data[] = [
+                            $key, $item,
+                        ];
+                    }
+                    $this->io->table(
+                        ['KEY', 'MEMBER'],
+                        $data
+                    );
+                    break;
+
             }
 
         } catch (\Exception $e) {
