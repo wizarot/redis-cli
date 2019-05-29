@@ -52,8 +52,6 @@ class RedisCommand extends SymfonyCommand
             } catch (\Exception $exception) {
                 $this->redis->connect($host, $port);
             }
-            //            $io->progressAdvance(1);
-
 
             // 处理命令行逻辑
             switch (true) {
@@ -120,79 +118,8 @@ class RedisCommand extends SymfonyCommand
         } while (strtolower($command) != 'exit');
 
         $io->success('Bye!');
-        die;
 
-        $io->success('Lorem ipsum dolor sit amet');
-        $io->warning('Lorem ipsum dolor sit amet');
-        $io->error('Lorem ipsum dolor sit amet');
-
-
-        $io->title('Lorem Ipsum Dolor Sit Amet');
-        $io->section('Adding a User');
-        $io->text('Lorem ipsum dolor sit amet');
-        $io->listing([
-                'Element #1 Lorem ipsum dolor sit amet',
-                'Element #2 Lorem ipsum dolor sit amet',
-                'Element #3 Lorem ipsum dolor sit amet',
-            ]
-        );
-        $io->table(
-            ['Header 1', 'Header 2'],
-            [
-                ['Cell 1-1', 'Cell 1-2'],
-                ['Cell 2-1', 'Cell 2-2'],
-                ['Cell 3-1', 'Cell 3-2'],
-            ]
-        );
-        $io->note('Lorem ipsum dolor sit amet');
-        $io->note([
-                'Lorem ipsum dolor sit amet',
-                'Consectetur adipiscing elit',
-                'Aenean sit amet arcu vitae sem faucibus porta',
-            ]
-        );
-        $io->caution([
-                'Lorem ipsum dolor sit amet',
-                'Consectetur adipiscing elit',
-                'Aenean sit amet arcu vitae sem faucibus porta',
-            ]
-        );
-        $io->progressStart();
-        $io->progressStart(100);
-
-        $io->progressAdvance();
-        $io->progressAdvance(10);
-        $io->progressFinish();
-
-        $io->ask('What is your name?');
-        $io->ask('Where are you from?', 'United States');//默认值
-        $io->ask('Number of workers to start', 1, function($number) {
-            if (!is_numeric($number)) {
-                throw new \RuntimeException('You must type a number.');
-            }
-
-            return (int)$number;
-        }
-        );
-        $io->askHidden('What is your password?');
-        $password = $io->askHidden('What is your password?', function($password) {
-            if (empty($password)) {
-                throw new \RuntimeException('Password cannot be empty.');
-            }
-
-            return $password;
-        }
-        );
-        var_dump($password);
-        $io->confirm('Restart the web server?');
-        $io->choice('Select the queue to analyze', ['queue1', 'queue2', 'queue3']);
-
-
-        //        $output->writeln([
-        //            '<info>Lorem Ipsum Dolor Sit Amet</info>',
-        //            '<info>==========================</info>',
-        //            '',
-        //        ]);
+        return true;
     }
 
     // 获取列表和key对应的类型,并返回表格
@@ -367,6 +294,8 @@ class RedisCommand extends SymfonyCommand
                 if (!$confirm) {
                     return true;
                 }
+                // 这里显示下之前旧值,方便修改
+                $this->get($parameters);
             }
             $type = $this->io->choice('请选择数据类型', ['<fg=black;bg=cyan>String</>', '<fg=black;bg=magenta>Hash</>', '<fg=black;bg=yellow>List</>', '<fg=black;bg=green>Set</>', '<fg=black;bg=blue>ZSet</>']);
             $type = strip_tags($type);
@@ -384,11 +313,191 @@ class RedisCommand extends SymfonyCommand
                     $this->redis->set($key, $value);
                     $this->io->success("Key:[$key]设置为: $value");
                     break;
+                case 'Hash':
+                    $this->setHash($key);
+                    break;
+                case 'List':
+                    $this->setList($key);
+                    break;
+                case 'Set':
+                    $this->setSet($key);
+                    break;
+                case 'ZSet':
+                    $this->setZSet($key);
+                    break;
             }
 
         } catch (\Exception $e) {
             $this->io->error($e->getMessage());
         }
+    }
+
+    protected function setZSet($key)
+    {
+        $item_key = $this->io->ask('add <score> <item> | rm <item>', null, function($value) {
+            if (empty($value)) {
+                throw new \RuntimeException('不能为空');
+            }
+
+            return $value;
+        }
+        );
+        $item_key = trim($item_key);
+
+        switch (true) {
+            case stripos($item_key, 'add ') === 0 :
+                $parameter = trim(substr($item_key, 4));
+                $parameter = explode(' ', $parameter, 2);
+
+                $this->redis->zAdd($key, (int)$parameter[0], $parameter[1]);
+                $this->io->success("插入成功!");
+                break;
+            case stripos($item_key, 'rm ') === 0 :
+                $parameter = trim(substr($item_key, 3));
+                $this->redis->zRem($key, $parameter);
+                $this->io->success("删除成功!");
+                break;
+            default:
+                throw new \RuntimeException("没有这个命令");
+        }
+
+        // 修改好之后显示下效果
+        $this->get([$key]);
+
+        return true;
+    }
+
+    protected function setSet($key)
+    {
+        $item_key = $this->io->ask('add <item> | rm <item>', null, function($value) {
+            if (empty($value)) {
+                throw new \RuntimeException('不能为空');
+            }
+
+            return $value;
+        }
+        );
+        $item_key = trim($item_key);
+
+        switch (true) {
+            case stripos($item_key, 'add ') === 0 :
+                $parameter = trim(substr($item_key, 4));
+                $parameter = explode(' ', $parameter, 2);
+
+                $this->redis->sAdd($key, $parameter[0]);
+                $this->io->success("插入成功!");
+                break;
+            case stripos($item_key, 'rm ') === 0 :
+                $parameter = trim(substr($item_key, 3));
+                $this->redis->sRem($key, $parameter);
+                $this->io->success("删除成功!");
+                break;
+            default:
+                throw new \RuntimeException("没有这个命令");
+        }
+
+        // 修改好之后显示下效果
+        $this->get([$key]);
+
+        return true;
+    }
+
+    protected function setList($key)
+    {
+        $item_key = $this->io->ask('lpush/rpush <value> | lpop/rpop 进行操作', null, function($value) {
+            if (empty($value)) {
+                throw new \RuntimeException('不能为空');
+            }
+
+            return $value;
+        }
+        );
+        $item_key = trim($item_key);
+
+        switch (true) {
+            case stripos($item_key, 'lpush ') === 0 :
+                $parameter = trim(substr($item_key, 6));
+                $this->redis->lPush($key, $parameter);
+                $this->io->success("插入成功!");
+                break;
+            case stripos($item_key, 'rpush ') === 0 :
+                $parameter = trim(substr($item_key, 6));
+                $this->redis->rPush($key, $parameter);
+                $this->io->success("插入成功!");
+                break;
+            case stripos($item_key, 'lpop') === 0 :
+                $parameter = trim(substr($item_key, 5));
+                $v = $this->redis->lPop($key);
+                $this->io->success("值 [$v] 出队");
+                break;
+            case stripos($item_key, 'rpop') === 0 :
+                $parameter = trim(substr($item_key, 5));
+                $v = $this->redis->rPop($key);
+                $this->io->success("值 [$v] 出队");
+                break;
+        }
+
+
+        // 修改好之后显示下效果
+        $this->get([$key]);
+
+        return true;
+    }
+
+    // 设置 hash数据
+    protected function setHash($key)
+    {
+        $item_key = $this->io->ask('请输入key [rm key :用来删除hash_key | mv key new_key :用来修改hash_key]', null, function($value) {
+            if (empty($value)) {
+                throw new \RuntimeException('不能为空');
+            }
+
+            return $value;
+        }
+        );
+        $item_key = trim($item_key);
+
+        // TODO: 流程太复杂,有待优化
+        switch (true) {
+            case stripos($item_key, 'rm ') === 0 :
+                $parameter = trim(substr($item_key, 3));
+                $this->redis->hDel($key, $parameter);
+                $this->io->success("删除成功!");
+                break;
+            case stripos($item_key, 'mv ') === 0 :
+                $parameter = trim(substr($item_key, 3));
+                $parameter = explode(' ', $parameter, 2);
+                if (count($parameter) != 2) {
+                    throw new \RuntimeException('缺少参数');
+                }
+                $v = $this->redis->hGet($key, $parameter[0]);
+                // 改名操作 - 是否用事务?
+                $this->redis->multi();
+                $this->redis->hSet($key, $parameter[1], $v);
+                $this->redis->hDel($key, $parameter[0]);
+                $this->redis->exec();
+
+                $this->io->success("修改成功!");
+                break;
+            default:
+                // 处理下不同的逻辑 设置/删除/修改
+                $item_value = $this->io->ask('请输入value', null, function($value) {
+                    if (empty($value)) {
+                        throw new \RuntimeException('不能为空');
+                    }
+
+                    return $value;
+                }
+                );
+                $this->redis->hSet($key, $item_key, $item_value);
+                $this->io->success("修改成功!");
+        }
+
+
+        // 修改好之后显示下效果
+        $this->get([$key]);
+
+        return true;
     }
 
     // 获取key数据详细内容
@@ -435,6 +544,10 @@ class RedisCommand extends SymfonyCommand
                         $this->io->section('CONVERSION:');
                         print_r($data);
                     }
+
+                    // 清理下数据
+                    unset($content);
+                    unset($data);
                     break;
                 case 2:
                     // 集合set
