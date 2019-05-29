@@ -10,4 +10,22 @@ $command = new \Console\RedisCommand();
 $app = new Application('Console Redis Cli (Redis客户端)', 'v1.0.0');
 $app->add($command);
 $app->setDefaultCommand($command->getName());
+
+//$app->register('ask-color')->setCode(function (\Symfony\Component\Console\Input\InputInterface $input, \Symfony\Component\Console\Output\OutputInterface $output) use ($app) {
+//    $colors = array('red', 'blue', 'yellow', 'yellow-light', 'yellow-dark');
+//    $validation = function ($color) use ($colors) {
+//        if (!in_array($color, array_values($colors))) {
+//            throw new \InvalidArgumentException(sprintf('Color "%s" is invalid.', $color));
+//        }
+//
+//        return $color;
+//    };
+//
+//    // ask and validate the answer
+//    $dialog = $app->getHelperSet()->get('dialog');
+//    $color = $dialog->askAndValidate($output, 'Enter your favorite color (default to red): ', $validation, false, 'red', $colors);
+//
+//    $output->writeln(sprintf('You have just entered: %s', $color));
+//});
+
 $app->run();

@@ -7,6 +7,8 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Question\ConfirmationQuestion;
+use Symfony\Component\Console\Question\Question;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 
@@ -61,7 +63,7 @@ class RedisCommand extends SymfonyCommand
                     if ($result === true) {
                         $this->db = $parameter;
                         $this->io->success('数据库切换成功!');
-                    }else{
+                    } else {
                         $this->io->error('数据库切换失败!');
                     }
                     break;
@@ -132,6 +134,15 @@ class RedisCommand extends SymfonyCommand
         $io->success('Bye!');
 
         return true;
+
+//        新特性 - 自动帮助填写答案
+//        $helper = $this->getHelper('question');
+//        $bundles = ['AcmeDemoBundle', 'AcmeBlogBundle', 'AcmeStoreBundle'];
+//        $question = new Question('Please enter the name of a bundle:', 'FooBundle');
+//        $question->setAutocompleterValues($bundles);
+//
+//        $bundleName = $helper->ask($input, $output, $question);
+//        var_dump($bundleName);
     }
 
     protected function connRedis()
@@ -346,16 +357,39 @@ class RedisCommand extends SymfonyCommand
         try {
             $key = $parameters[0];
             if ($this->redis->exists($key)) {
-                $confirm = $this->io->confirm("KEY: {$key} 已存在,确定覆盖?", false);
+                $confirm = $this->io->confirm("KEY: {$key} 已存在,确定覆盖?", true);
                 if (!$confirm) {
                     return true;
                 }
                 // 这里显示下之前旧值,方便修改
                 $this->get($parameters);
+                $type = $this->redis->type($key);
+                // 从整型值,转换为下面兼容的类型.
+                switch ($type) {
+                    case 1:
+                        $type = 'String';
+                        break;
+                    case 2:
+                        $type = 'Set';
+                        break;
+                    case 3:
+                        $type = 'List';
+                        break;
+                    case 4:
+                        $type = 'ZSet';
+                        break;
+                    case 5:
+                        $type = 'Hash';
+                        break;
+                }
+            } else {
+                // 优化下这个逻辑,虽然修改已有数据类型是允许的,但是为了方便使用,我这里设置成不能改
+                $type = $this->io->choice('请选择数据类型', ['<fg=black;bg=cyan>String</>', '<fg=black;bg=magenta>Hash</>', '<fg=black;bg=yellow>List</>', '<fg=black;bg=green>Set</>', '<fg=black;bg=blue>ZSet</>']);
+                $type = strip_tags($type);
             }
-            $type = $this->io->choice('请选择数据类型', ['<fg=black;bg=cyan>String</>', '<fg=black;bg=magenta>Hash</>', '<fg=black;bg=yellow>List</>', '<fg=black;bg=green>Set</>', '<fg=black;bg=blue>ZSet</>']);
-            $type = strip_tags($type);
-            // TODO: 处理不同类型数据
+
+
+            // 处理不同类型数据
             switch ($type) {
                 case 'String':
                     $value = $this->io->ask('请输入值', null, function($value) {
