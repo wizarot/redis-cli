@@ -15,6 +15,10 @@ class RedisCommand extends SymfonyCommand
     /** @var \Redis */
     protected $redis;
 
+    protected $host;
+    protected $port;
+    protected $db = '-';
+
     /** @var SymfonyStyle */
     protected $io;
 
@@ -29,23 +33,13 @@ class RedisCommand extends SymfonyCommand
         $io = new SymfonyStyle($input, $output);
         $this->io = $io;
 
-        // 输入服务器和port
-        $host = $io->ask('Redis服务器host', '127.0.0.1');
-        $port = $io->ask('Redis服务器port', '6379');
-        // TODO: 输入密码..
+        $this->connRedis();
+        $host = $this->host;
+        $port = $this->port;
 
-        // 连接服务器
-        try {
-            $this->redis = new \Redis();
-            $this->redis->connect($host, $port);
-            $io->success("连接服务器 {$host}:{$port} 成功!");
-        } catch (\Exception $e) {
-            $io->error("连接服务器 {$host}:{$port} 失败!");
-            die;
-        }
 
         do {
-            $command = trim($io->ask("{$host}:{$port}", '-'));
+            $command = trim($io->ask("{$host}:{$port}", $this->db));
             // 每次执行前,查看重连数据库
             try {
                 $this->redis->ping();
@@ -55,6 +49,22 @@ class RedisCommand extends SymfonyCommand
 
             // 处理命令行逻辑
             switch (true) {
+                case stripos($command, 'config') === 0 :
+                    // 只弄一个方便阅读配置文件,不打算支持修改
+                    $parameter = trim(substr($command, 7));
+                    $this->getConfig($parameter);
+                    break;
+                case stripos($command, 'select ') === 0 :
+                    // 切换数据库
+                    $parameter = trim(substr($command, 7));
+                    $result = $this->redis->select($parameter);
+                    if ($result === true) {
+                        $this->db = $parameter;
+                        $this->io->success('数据库切换成功!');
+                    }else{
+                        $this->io->error('数据库切换失败!');
+                    }
+                    break;
                 case stripos($command, 'ls') === 0 :
                     $parameter = trim(substr($command, 2));
                     // 先写这里,回头再抽象
@@ -101,6 +111,7 @@ class RedisCommand extends SymfonyCommand
                     $io->title('Help List 命令列表');
                     $io->listing([
                             'help : 显示可用命令',
+                            'select < 0 > : 切换数据库,默认0 ',
                             'ls : 列出所有keys',
                             'ls h?llo : 列出匹配keys,?通配1个字符,*通配任意长度字符,[aei]通配选线,特殊符号用\隔开',
                             'ttl key [ttl second] : 获取/设定生存时间,传第二个参数会设置生存时间',
@@ -108,6 +119,7 @@ class RedisCommand extends SymfonyCommand
                             'rm key : 刪除key,暂时不支持通配符匹配(太危险,没想好是否要支持)',
                             'get key : 获取值',
                             'set key : 设置值',
+                            'config  [dir]: 获取配置,可选参数[配置名称(支持通配符)]',
                         ]
                     );
 
@@ -120,6 +132,50 @@ class RedisCommand extends SymfonyCommand
         $io->success('Bye!');
 
         return true;
+    }
+
+    protected function connRedis()
+    {
+        $this->redis = new \Redis();
+
+        do {
+            // 输入服务器和port
+            $this->host = $host = $this->io->ask('Redis服务器host', '127.0.0.1');
+            $this->port = $port = $this->io->ask('Redis服务器port', '6379');
+            // TODO: 输入密码..
+            //            $this->redis->auth();
+
+            $connResult = @$this->redis->connect($host, $port);
+            if (!$connResult) {
+                $this->io->error("连接服务器 {$host}:{$port} 失败!");
+            }
+
+        } while ($connResult != true);
+
+
+        // 连接服务器
+        $this->io->success("连接服务器 {$host}:{$port} 成功!");
+        // 默认使用 0 号数据库
+        $this->db = 0;
+
+        return true;
+    }
+
+    // 列出配置信息
+    protected function getConfig($parameter)
+    {
+        if (empty($parameter)) {
+            $parameter = '*';
+        }
+        $config = $this->redis->config('GET', $parameter);
+        $data = [];
+        foreach ($config as $k => $item) {
+            $data[] = [
+                $k, $item,
+            ];
+        }
+        $this->io->section("CONFIG:");
+        $this->io->table(['ITEM', 'VALUE'], $data);
     }
 
     // 获取列表和key对应的类型,并返回表格
