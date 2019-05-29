@@ -44,6 +44,8 @@ class RedisCommand extends SymfonyCommand
             die;
         }
 
+        //        $io->progressStart();
+
         do {
             $command = trim($io->ask("{$host}:{$port}", '-'));
             // 每次执行前,查看重连数据库
@@ -52,6 +54,7 @@ class RedisCommand extends SymfonyCommand
             } catch (\Exception $exception) {
                 $this->redis->connect($host, $port);
             }
+            //            $io->progressAdvance(1);
 
 
             // 处理命令行逻辑
@@ -66,8 +69,10 @@ class RedisCommand extends SymfonyCommand
                             'ttl key [ttl second] : 获取/设定生存时间,传第二个参数会设置生存时间',
                             'mv key new_key : key改名,如果新名字存在则会报错',
                             'rm key : 刪除key,暂时不支持通配符匹配(太危险,没想好是否要支持)',
+                            'set key : 设置值',
                         ]
                     );
+
                     break;
                 case stripos($command, 'ls') === 0 :
                     $parameter = trim(substr($command, 2));
@@ -93,12 +98,23 @@ class RedisCommand extends SymfonyCommand
                     $parameter = explode(' ', $parameter, 2);
                     $this->rm($parameter);
                     break;
+                case stripos($command, 'set') === 0 :
+                    $parameter = trim(substr($command, 3));
+                    $parameter = explode(' ', $parameter, 2);
+                    $this->set($parameter);
+                    break;
+                case stripos($command, 'get') === 0 :
+                    $parameter = trim(substr($command, 3));
+                    $parameter = explode(' ', $parameter, 2);
+                    $this->get($parameter);
+                    break;
+
                 default:
             }
 
         } while (strtolower($command) != 'exit');
 
-
+        //        $io->progressFinish();
         $io->success('Bye!');
         die;
 
@@ -196,23 +212,7 @@ class RedisCommand extends SymfonyCommand
             //        set(集合) int(2)
             //        zset(有序集) int(4)
             //        hash(哈希表) int(5)
-            switch ($type) {
-                case 1:
-                    $type = '<fg=black;bg=cyan>STRING</>';
-                    break;
-                case 2:
-                    $type = '<fg=black;bg=green>SET   </>';
-                    break;
-                case 3:
-                    $type = '<fg=black;bg=yellow>LIST  </>';
-                    break;
-                case 4:
-                    $type = '<fg=black;bg=blue>ZSET  </>';
-                    break;
-                case 5:
-                    $type = '<fg=black;bg=magenta>HASH  </>';
-                    break;
-            }
+            $type = $this->transType($type);
             $data[$key] = [$type, $key];
         }
 
@@ -224,21 +224,69 @@ class RedisCommand extends SymfonyCommand
 
     }
 
+    // 从 0,1,2..这种类型,转换成显示类型
+    protected function transType($type)
+    {
+        switch ($type) {
+            case 1:
+                $type = '<fg=black;bg=cyan>STRING</>';
+                break;
+            case 2:
+                $type = '<fg=black;bg=green>SET   </>';
+                break;
+            case 3:
+                $type = '<fg=black;bg=yellow>LIST  </>';
+                break;
+            case 4:
+                $type = '<fg=black;bg=blue>ZSET  </>';
+                break;
+            case 5:
+                $type = '<fg=black;bg=magenta>HASH  </>';
+                break;
+        }
+
+        return $type;
+    }
+
+    // 转换为方便输出的ttl格式
+    protected function transTtl($ttl)
+    {
+        switch ($ttl) {
+            case -2:
+                $ttl = '<fg=black;bg=magenta>KEY不存在</>';
+                break;
+            case -1:
+                $ttl = '<fg=black;bg=cyan>永久</>';
+                break;
+            default:
+        }
+
+        return $ttl;
+    }
+
+    // 尝试将string类型数据,转换为数组或反序列化,如果成功那么就返回正常显示
+    protected function convertString($string)
+    {
+        $data = json_decode($string, true);
+        if (is_array($data)) {
+            return $data;
+        }
+
+        $data = @unserialize($string);
+        if ($data !== false) {
+            return $data;
+        }
+
+        return false;
+    }
+
     // 获取并显示数据的ttl生存时间
     protected function getTtl($parameters)
     {
         try {
             $ttl = $this->redis->ttl($parameters[0]);
             // 格式化显示
-            switch ($ttl) {
-                case -2:
-                    $ttl = '<fg=black;bg=magenta>KEY不存在</>';
-                    break;
-                case -1:
-                    $ttl = '<fg=black;bg=cyan>永久</>';
-                    break;
-                default:
-            }
+            $ttl = $this->transTtl($ttl);
             $this->io->table(['KEY', 'TTL (秒s)'], [
                     [$parameters[0], $ttl],
                 ]
@@ -298,6 +346,92 @@ class RedisCommand extends SymfonyCommand
             if ($confirm) {
                 $this->redis->del($parameters[0]);
                 $this->io->success("删除成功");
+            }
+
+        } catch (\Exception $e) {
+            $this->io->error($e->getMessage());
+        }
+    }
+
+    // 设置key
+    protected function set($parameters)
+    {
+        try {
+            $key = $parameters[0];
+            if ($this->redis->exists($key)) {
+                $confirm = $this->io->confirm("KEY: {$key} 已存在,确定覆盖?", false);
+                if (!$confirm) {
+                    return true;
+                }
+            }
+            $type = $this->io->choice('请选择数据类型', ['<fg=black;bg=cyan>String</>', '<fg=black;bg=magenta>Hash</>', '<fg=black;bg=yellow>List</>', '<fg=black;bg=green>Set</>', '<fg=black;bg=blue>ZSet</>']);
+            $type = strip_tags($type);
+            // TODO: 处理不同类型数据
+            switch ($type) {
+                case 'String':
+                    $value = $this->io->ask('请输入值', null, function($value) {
+                        if (empty($value)) {
+                            throw new \RuntimeException('不能为空');
+                        }
+
+                        return $value;
+                    }
+                    );
+                    $this->redis->set($key, $value);
+                    $this->io->success("Key:[$key]设置为: $value");
+                    break;
+            }
+
+        } catch (\Exception $e) {
+            $this->io->error($e->getMessage());
+        }
+    }
+
+    // 获取key数据详细内容
+    protected function get($parameters)
+    {
+        try {
+            if (!$this->redis->exists($parameters[0])) {
+                throw new \Exception("KEY: {$parameters[0]} 不存在");
+            }
+            $key = $parameters[0];
+            // 获取类型
+            $type = $this->redis->type($key);
+            $typeStr = $this->transType($type);
+            // 获取ttl
+            $ttl = $this->redis->ttl($key);
+            $ttlStr = $this->transTtl($ttl);
+            // 输出
+            $this->io->section('STATUS:');
+            $this->io->table(
+                ['TYPE', 'KEY', 'TTL'],
+                [
+                    [$typeStr, $key, $ttlStr],
+                ]
+            );
+
+            // TODO: 根据类型显示值
+            //        none(key不存在) int(0)
+            //        string(字符串) int(1)
+            //        list(列表) int(3)
+            //        set(集合) int(2)
+            //        zset(有序集) int(4)
+            //        hash(哈希表) int(5)
+            switch ($type) {
+                case 0:
+                    throw new \Exception("KEY: {$key} 不存在");
+                    break;
+                case 1:
+                    $this->io->section('VALUE:');
+                    $content = (string)$this->redis->get($key);
+                    $this->io->text($content);
+                    // 尝试转换json或者反序列化,如果成功那么就再显示下.
+                    $data = $this->convertString($content);
+                    if ($data !== false) {
+                        $this->io->section('CONVERSION:');
+                        print_r($data);
+                    }
+                    break;
             }
 
         } catch (\Exception $e) {
