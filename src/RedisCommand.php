@@ -501,38 +501,6 @@ class RedisCommand extends SymfonyCommand
         } while ($exit != true);
 
         return true;
-
-        $item_key = $this->io->ask('add <score> <item> | rm <item>', null, function($value) {
-            if (empty($value)) {
-                throw new \RuntimeException('不能为空');
-            }
-
-            return $value;
-        }
-        );
-        $item_key = trim($item_key);
-
-        switch (true) {
-            case stripos($item_key, 'add ') === 0 :
-                $parameter = trim(substr($item_key, 4));
-                $parameter = explode(' ', $parameter, 2);
-
-                $this->redis->zAdd($key, (int)$parameter[0], $parameter[1]);
-                $this->io->success("插入成功!");
-                break;
-            case stripos($item_key, 'rm ') === 0 :
-                $parameter = trim(substr($item_key, 3));
-                $this->redis->zRem($key, $parameter);
-                $this->io->success("删除成功!");
-                break;
-            default:
-                throw new \RuntimeException("没有这个命令");
-        }
-
-        // 修改好之后显示下效果
-        $this->get([$key]);
-
-        return true;
     }
 
     protected function setSet($key)
