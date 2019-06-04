@@ -14,7 +14,7 @@
  - 原因2: Medis客户端收费了,同事想用发现找个简单操作的没有. 吹牛说自己写一个,于是填坑. 
 
 ## 安装方法
-  1. clone项目代码:  git clone git@github.com:wizarot/redis-cli.git
+  1. clone项目代码:  git clone https://github.com/wizarot/redis-cli.git
   2. 进入文件件:  cd redis-cli
   3. 切换到当前最新版本tag:  git checkout v1.0.0
   4. 使用composer安装依赖包: composer update
