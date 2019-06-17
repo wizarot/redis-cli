@@ -16,7 +16,7 @@
 ## 安装方法
   1. clone项目代码:  git clone https://github.com/wizarot/redis-cli.git
   2. 进入文件件:  cd redis-cli
-  3. 切换到当前最新版本tag:  git checkout v1.0
+  3. 切换到当前最新版本tag:  git checkout v1.1
   4. 使用composer安装依赖包: composer update
 
 ## 使用方法
