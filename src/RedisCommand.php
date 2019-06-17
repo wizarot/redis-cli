@@ -16,6 +16,8 @@ class RedisCommand extends SymfonyCommand
     protected $host;
     protected $port;
     protected $db = '-';
+    protected $version = '';// 标记下redis-server版本
+    protected $pageNumber = 50;//分页显示,每页数量
 
     /** @var SymfonyStyle */
     protected $io;
@@ -51,6 +53,11 @@ class RedisCommand extends SymfonyCommand
                     // 只弄一个方便阅读配置文件,不打算支持修改
                     $parameter = trim(substr($command, 7));
                     $this->getConfig($parameter);
+                    break;
+                case stripos($command, 'info') === 0 :
+                    // 只弄一个方便阅读配置文件,不打算支持修改
+                    $parameter = trim(substr($command, 4));
+                    $this->getInfo($parameter);
                     break;
                 case stripos($command, 'select ') === 0 :
                     // 切换数据库
@@ -123,6 +130,8 @@ class RedisCommand extends SymfonyCommand
                             'get key : 获取值',
                             'set key : 设置值',
                             'config  [dir]: 获取配置,可选参数[配置名称(支持通配符)]',
+                            'info: 获取当前Redis服务器信息',
+
                         ]
                     );
 
@@ -169,6 +178,10 @@ class RedisCommand extends SymfonyCommand
         $this->io->success("连接服务器 {$host}:{$port} 成功!");
         // 默认使用 0 号数据库
         $this->db = 0;
+        $info = $this->redis->info();
+        if (key_exists('redis_version', $info)) {
+            $this->version = $info['redis_version'];
+        }
 
         return true;
     }
@@ -198,36 +211,84 @@ class RedisCommand extends SymfonyCommand
         $this->io->table(['ITEM', 'VALUE'], $data);
     }
 
+    protected function getInfo($parameter)
+    {
+        $info = $this->redis->info();
+
+        $data = [];
+        foreach ($info as $k => $item) {
+            $data[] = [
+                $k, $item,
+            ];
+        }
+        $this->io->section("INFO:");
+        $this->io->table(['ITEM', 'VALUE'], $data);
+    }
+
     // 获取列表和key对应的类型,并返回表格
     protected function listTable($search = '')
     {
         if (empty($search)) {
             $search = '*';
         }
-        $keys = $this->redis->keys($search);
-        sort($keys);
-        $data = [];
-        foreach ($keys as $key) {
-            $type = $this->redis->type($key);
-            if ($type == 0) {
-                continue;//不存在那么就直接跳过
+        // 换个方式,大于2.8.0那么使用Scan搜索
+        if (version_compare($this->version, '2.8.0')) {
+            $iterator = null;
+            while ($keys = $this->redis->scan($iterator, $search, $this->pageNumber)) {
+                $data = [];
+                foreach ($keys as $key) {
+                    $type = $this->redis->type($key);
+                    if ($type == 0) {
+                        continue;//不存在那么就直接跳过
+                    }
+                    // 根据类型显示颜色
+                    $type = $this->transType($type);
+                    $data[$key] = [$type, $key];
+                }
+                $this->io->table(
+                    ['TYPE', 'KEY'],
+                    $data
+                );
+
+                // 最后一页似乎不需要?
+                if (count($data) == $this->pageNumber) {
+                    $isBreak = $this->io->confirm('回车继续...');
+                    if (!$isBreak) {
+                        return true;
+                    }
+                }
             }
-            // 根据类型显示颜色
-            //        none(key不存在) int(0)
-            //        string(字符串) int(1)
-            //        list(列表) int(3)
-            //        set(集合) int(2)
-            //        zset(有序集) int(4)
-            //        hash(哈希表) int(5)
-            $type = $this->transType($type);
-            $data[$key] = [$type, $key];
+        } else {
+            $keys = $this->redis->keys($search);
+            sort($keys);
+            $data = [];
+            // 加一个分页功能
+            foreach ($keys as $row => $key) {
+                $type = $this->redis->type($key);
+                if ($type == 0) {
+                    continue;//不存在那么就直接跳过
+                }
+                // 根据类型显示颜色
+                $type = $this->transType($type);
+                $data[$key] = [$type, $key];
+                if ($row != 0 && $row % $this->pageNumber == 0) {
+                    $this->io->table(
+                        ['TYPE', 'KEY'],
+                        $data
+                    );
+                    $isBreak = $this->io->confirm('回车继续...');
+                    if (!$isBreak) {
+                        return true;
+                    }
+                    $data = [];
+                }
+            }
+
+            $this->io->table(
+                ['TYPE', 'KEY'],
+                $data
+            );
         }
-
-        $this->io->table(
-            ['TYPE', 'KEY'],
-            $data
-        );
-
 
     }
 
