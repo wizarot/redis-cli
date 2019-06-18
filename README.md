@@ -21,6 +21,7 @@
 
 ## 使用方法
  - 启动: ./redis-cli
+ - windows启动: redis-cli.bat (可能需要自行编辑一下,手动修改php.exe文件的路径)
  - 输入redis连接: host port (可以启用auth输入密码,如果有需要自己去src/RedisCommand.php -> connRedis() 修改 )
  - help 或者 随意输入别的,显示帮助列表
  - exit 或者 ctrl+D 退出
