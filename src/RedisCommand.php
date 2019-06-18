@@ -3,8 +3,11 @@
 namespace Console;
 
 use Symfony\Component\Console\Command\Command as SymfonyCommand;
+use Symfony\Component\Console\Input\Input;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\Output;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Question\Question;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 
@@ -18,6 +21,23 @@ class RedisCommand extends SymfonyCommand
     protected $db = '-';
     protected $version = '';// 标记下redis-server版本
     protected $pageNumber = 50;//分页显示,每页数量
+    protected $history = [ //命令历史,感觉应该控制下总体数量,暂时1000条,否则把内存撑爆了就太搞笑了..
+                           'help',
+                           'ls',
+                           'get',
+                           'set',
+                           'config',
+                           'info',
+                           'mv',
+                           'rm',
+                           'exit',
+                           'ttl',
+                           'exit',
+    ];
+    /** @var Input */
+    protected $input;
+    /** @var Output */
+    protected $output;
 
     /** @var SymfonyStyle */
     protected $io;
@@ -30,6 +50,8 @@ class RedisCommand extends SymfonyCommand
 
     public function execute(InputInterface $input, OutputInterface $output)
     {
+        $this->input = $input;
+        $this->output = $output;
         $io = new SymfonyStyle($input, $output);
         $this->io = $io;
 
@@ -39,7 +61,9 @@ class RedisCommand extends SymfonyCommand
 
 
         do {
-            $command = trim($io->ask("{$host}:{$port}", $this->db));
+            // $command = trim($io->ask("{$host}:{$port}", $this->db));
+            $command = trim($this->autoAsk("{$host}:{$port}", $this->db));
+
             // 每次执行前,查看重连数据库
             try {
                 $this->redis->ping();
@@ -144,15 +168,27 @@ class RedisCommand extends SymfonyCommand
         $io->success('Bye!');
 
         return true;
+    }
 
-        //        新特性 - 自动帮助填写答案
-        //        $helper = $this->getHelper('question');
-        //        $bundles = ['AcmeDemoBundle', 'AcmeBlogBundle', 'AcmeStoreBundle'];
-        //        $question = new Question('Please enter the name of a bundle:', 'FooBundle');
-        //        $question->setAutocompleterValues($bundles);
-        //
-        //        $bundleName = $helper->ask($input, $output, $question);
-        //        var_dump($bundleName);
+    // 新特性,自动填写答案,上下可以给出自动帮助
+    protected function autoAsk($question, $default, $history = [])
+    {
+        if (empty($history)) {
+            $history = $this->history;
+        }
+        $questionObj = new Question($question, $default);
+        $questionObj->setAutocompleterValues($history);
+
+        $command = $this->io->askQuestion($questionObj);
+        if (!in_array($command, $this->history)) {
+            $this->history[] = $command;
+            // 控制下操作记录仅包含1000条
+            if (count($this->history) > 1000) {
+                array_shift($this->history);
+            }
+        }
+
+        return $command;
     }
 
     protected function connRedis()
