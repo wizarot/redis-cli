@@ -197,8 +197,8 @@ class RedisCommand extends SymfonyCommand
 
         do {
             // 输入服务器和port
-            $this->host = $host = $this->io->ask('Redis服务器host', '127.0.0.1');
-            $this->port = $port = $this->io->ask('Redis服务器port', '6379');
+            $this->host = $host = $this->autoAsk('Redis服务器host', '127.0.0.1', ['127.0.0.1']);
+            $this->port = $port = $this->autoAsk('Redis服务器port', '6379', ['6379']);
             // TODO: 输入密码..
             //            $this->redis->auth();
 
