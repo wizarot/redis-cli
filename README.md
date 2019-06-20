@@ -16,7 +16,7 @@
 ## 安装方法
   1. clone项目代码:  git clone https://github.com/wizarot/redis-cli.git
   2. 进入文件件:  cd redis-cli
-  3. 切换到当前最新版本tag:  git checkout v1.2
+  3. 切换到当前最新版本tag:  git checkout v1.3
   4. 使用composer安装依赖包: composer update
 
 ## 使用方法
@@ -26,6 +26,8 @@
  - help 或者 随意输入别的,显示帮助列表
  - exit 或者 ctrl+D 退出
  - 需要php安装redis扩展. 如果实在没有那考虑自己引入pRedis bundle然后改一下 connRedis()函数就能用了,不会提issue.我抽空处理
+ - 可以自定义样式,复制config/style.php 到 config/customStyle.php 自己修改相应颜色
+ - 可用颜色: [default, black, red, green, yellow, blue, magenta, cyan, white]
  
  ## 特性 (如果有需求或者其他想法可以提issue)
  - (v1.2新特性)输入模仿Linux可以记录命令历史和自动帮助,上下箭头查看历史记录. (小功能但是方便了很多!)
@@ -52,4 +54,4 @@
   - [x] 完善自动填写功能,如果没有考虑自己加一个
   - [x] 完善上下箭头访问命令历史功能
   - [x] 完善windows命令行可执行文件使用 (有待测试和调整)
-  - [ ] 把显示颜色样式从项目中抽象出来放到配置文件中,方便用户自己微调
+  - [x] 把显示颜色样式从项目中抽象出来放到配置文件中,方便用户自己微调

@@ -6,3 +6,4 @@ composer.phar
 # composer.lock
 
 .idea/*
+config/customStyle.php

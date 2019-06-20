@@ -8,7 +8,6 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\Output;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\Question;
-use Symfony\Component\Console\Style\SymfonyStyle;
 
 
 class RedisCommand extends SymfonyCommand
@@ -39,7 +38,7 @@ class RedisCommand extends SymfonyCommand
     /** @var Output */
     protected $output;
 
-    /** @var SymfonyStyle */
+    /** @var CustomStyle */
     protected $io;
 
     public function configure()
@@ -52,7 +51,8 @@ class RedisCommand extends SymfonyCommand
     {
         $this->input = $input;
         $this->output = $output;
-        $io = new SymfonyStyle($input, $output);
+//        $io = new SymfonyStyle($input, $output);
+        $io = new CustomStyle($input, $output);
         $this->io = $io;
 
         $this->connRedis();
@@ -286,8 +286,8 @@ class RedisCommand extends SymfonyCommand
                     $data
                 );
 
-                // 最后一页似乎不需要?
-                if (count($data) == $this->pageNumber) {
+                // 最后一页不用了.
+                if (count($data) >= $this->pageNumber) {
                     $isBreak = $this->io->confirm('回车继续...');
                     if (!$isBreak) {
                         return true;
