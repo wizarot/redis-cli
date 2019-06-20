@@ -34,4 +34,4 @@ $style = [
 ];
 
 // 可以复制数组到customStyle.php文件中,自定义即可
-@include 'customStyle.php';
+@include __DIR__.'/customStyle.php';

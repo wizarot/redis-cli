@@ -35,7 +35,7 @@ class CustomStyle extends SymfonyStyle
         $this->lineLength = min($width - (int)(\DIRECTORY_SEPARATOR === '\\'), self::MAX_LINE_LENGTH);
         $style = [];
         // 导入一下显示颜色的配置文件
-        include 'config/style.php';
+        include __DIR__.'/../config/style.php';
         $this->style = $style;
         parent::__construct($input, $output);
     }
