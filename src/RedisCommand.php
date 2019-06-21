@@ -37,6 +37,7 @@ class RedisCommand extends SymfonyCommand
     protected $input;
     /** @var Output */
     protected $output;
+    protected $keys = [];// 记录下已有key,方便输入
 
     /** @var CustomStyle */
     protected $io;
@@ -51,7 +52,7 @@ class RedisCommand extends SymfonyCommand
     {
         $this->input = $input;
         $this->output = $output;
-//        $io = new SymfonyStyle($input, $output);
+        //        $io = new SymfonyStyle($input, $output);
         $io = new CustomStyle($input, $output);
         $this->io = $io;
 
@@ -175,6 +176,13 @@ class RedisCommand extends SymfonyCommand
     {
         if (empty($history)) {
             $history = $this->history;
+            $keys = $this->keys;
+            foreach ($keys as $i => $key) {
+                $keys[] = 'get ' . $key;
+                $keys[] = 'set ' . $key;
+            }
+            $history = array_merge($history, $keys);
+            $history = array_unique($history);
         }
         $questionObj = new Question($question, $default);
         $questionObj->setAutocompleterValues($history);
@@ -280,12 +288,13 @@ class RedisCommand extends SymfonyCommand
                     // 根据类型显示颜色
                     $type = $this->transType($type);
                     $data[$key] = [$type, $key];
+                    $this->keys[] = $key;
                 }
                 $this->io->table(
                     ['TYPE', 'KEY'],
                     $data
                 );
-
+                $this->keys = array_unique($this->keys);
                 // 最后一页不用了.
                 if (count($data) >= $this->pageNumber) {
                     $isBreak = $this->io->confirm('回车继续...');
@@ -293,6 +302,8 @@ class RedisCommand extends SymfonyCommand
                         return true;
                     }
                 }
+                $this->keys = array_unique($this->keys);
+
             }
         } else {
             $keys = $this->redis->keys($search);
@@ -307,6 +318,7 @@ class RedisCommand extends SymfonyCommand
                 // 根据类型显示颜色
                 $type = $this->transType($type);
                 $data[$key] = [$type, $key];
+                $this->keys[] = $key;
                 if ($row != 0 && $row % $this->pageNumber == 0) {
                     $this->io->table(
                         ['TYPE', 'KEY'],
@@ -314,6 +326,8 @@ class RedisCommand extends SymfonyCommand
                     );
                     $isBreak = $this->io->confirm('回车继续...');
                     if (!$isBreak) {
+                        $this->keys = array_unique($this->keys);
+
                         return true;
                     }
                     $data = [];
@@ -324,6 +338,7 @@ class RedisCommand extends SymfonyCommand
                 ['TYPE', 'KEY'],
                 $data
             );
+            $this->keys = array_unique($this->keys);
         }
 
     }
