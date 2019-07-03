@@ -151,7 +151,7 @@ class RedisCommand extends SymfonyCommand
                             'ttl key [ttl second] : 获取/设定生存时间,传第二个参数会设置生存时间',
                             'persist key : 移除给定key的生存时间',
                             'mv key new_key : key改名,如果新名字存在则会报错',
-                            'rm key : 刪除key,暂时不支持通配符匹配(太危险,没想好是否要支持)',
+                            'rm key : 刪除key,支持通配符匹配',
                             'get key : 获取值',
                             'set key : 设置值',
                             'config  [dir]: 获取配置,可选参数[配置名称(支持通配符)]',
@@ -458,12 +458,19 @@ class RedisCommand extends SymfonyCommand
     protected function rm($parameters)
     {
         try {
-            if (!$this->redis->exists($parameters[0])) {
+            // 支持 patten批量删除
+            $removeKeys = [];
+            while ($keys = $this->redis->scan($iterator, $parameters[0], $this->pageNumber)) {
+                $removeKeys = array_merge($removeKeys, $keys);
+            }
+
+            if (empty($removeKeys)) {
                 throw new \Exception("KEY: {$parameters[0]} 不存在");
             }
-            $confirm = $this->io->confirm("确定要删除 {$parameters[0]} ?", false);
+            $count = count($removeKeys);
+            $confirm = $this->io->confirm("确定要删除 {$parameters[0]} 共{$count}条记录 ?", false);
             if ($confirm) {
-                $this->redis->del($parameters[0]);
+                $this->redis->del($removeKeys);
                 $this->io->success("删除成功");
             }
 
